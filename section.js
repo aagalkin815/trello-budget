@@ -4,6 +4,9 @@ var t = window.TrelloPowerUp.iframe();
 
 var cfg = null;   // { b: approvedBudget, r: hourlyRate }
 var log = [];     // [{ y: 'T'|'E', d: desc, h: hours, c: category, a: amount, ts: 'YYYY-MM-DD' }]
+var editIndex = -1;  // index of the ledger entry currently being edited, -1 = none
+
+var CATEGORIES = ['Hotel', 'Meals', 'Travel', 'Vendor', 'Materials', 'Other'];
 
 /* ---------- helpers ---------- */
 
@@ -74,36 +77,175 @@ function renderLedger() {
   $('ledger-empty').classList.toggle('hidden', log.length > 0);
 
   log.forEach(function (e, i) {
-    var tr = document.createElement('tr');
-
-    function td(text, cls) {
-      var el = document.createElement('td');
-      el.textContent = text;
-      if (cls) el.className = cls;
-      tr.appendChild(el);
-    }
-
-    td(e.ts);
-    td(e.y === 'T' ? 'Time' : (e.c || 'Expense'));
-    td(e.d || '');
-    td(e.y === 'T' ? Number(e.h).toString() : '', 'num');
-    td(money(e.a), 'num');
-
-    var actions = document.createElement('td');
-    actions.className = 'num';
-    var del = document.createElement('button');
-    del.className = 'del';
-    del.title = 'Delete entry';
-    del.textContent = '\u00d7';
-    del.addEventListener('click', function () {
-      log.splice(i, 1);
-      save().then(render);
-    });
-    actions.appendChild(del);
-    tr.appendChild(actions);
-
-    body.appendChild(tr);
+    body.appendChild(i === editIndex ? buildEditRow(e, i) : buildDisplayRow(e, i));
   });
+}
+
+function buildDisplayRow(e, i) {
+  var tr = document.createElement('tr');
+
+  function td(text, cls) {
+    var el = document.createElement('td');
+    el.textContent = text;
+    if (cls) el.className = cls;
+    tr.appendChild(el);
+  }
+
+  td(e.ts);
+  td(e.y === 'T' ? 'Time' : (e.c || 'Expense'));
+  td(e.d || '');
+  td(e.y === 'T' ? Number(e.h).toString() : '', 'num');
+  td(money(e.a), 'num');
+
+  var actions = document.createElement('td');
+  actions.className = 'num actions';
+
+  var edit = document.createElement('button');
+  edit.className = 'row-btn';
+  edit.title = 'Edit entry';
+  edit.textContent = '\u270e';
+  edit.addEventListener('click', function () {
+    editIndex = i;
+    renderLedger();
+    resize();
+  });
+  actions.appendChild(edit);
+
+  var del = document.createElement('button');
+  del.className = 'row-btn del';
+  del.title = 'Delete entry';
+  del.textContent = '\u00d7';
+  del.addEventListener('click', function () {
+    log.splice(i, 1);
+    editIndex = -1; // indexes shift after a delete; drop any open editor
+    save().then(render);
+  });
+  actions.appendChild(del);
+
+  tr.appendChild(actions);
+  return tr;
+}
+
+function buildEditRow(e, i) {
+  var tr = document.createElement('tr');
+  tr.className = 'edit-row';
+
+  function cell(child, cls, colSpan) {
+    var el = document.createElement('td');
+    if (cls) el.className = cls;
+    if (colSpan) el.colSpan = colSpan;
+    el.appendChild(child);
+    tr.appendChild(el);
+    return el;
+  }
+
+  // date
+  var dateIn = document.createElement('input');
+  dateIn.type = 'date';
+  dateIn.value = e.ts;
+  cell(dateIn);
+
+  // type/category
+  var catSel = null;
+  if (e.y === 'E') {
+    catSel = document.createElement('select');
+    CATEGORIES.forEach(function (c) {
+      var opt = document.createElement('option');
+      opt.textContent = c;
+      if (c === e.c) opt.selected = true;
+      catSel.appendChild(opt);
+    });
+    cell(catSel);
+  } else {
+    var typeSpan = document.createElement('span');
+    typeSpan.textContent = 'Time';
+    cell(typeSpan);
+  }
+
+  // description
+  var descIn = document.createElement('input');
+  descIn.type = 'text';
+  descIn.maxLength = 80;
+  descIn.value = e.d || '';
+  cell(descIn, 'grow-cell');
+
+  // hours (time) or amount (expense)
+  var hoursIn = null, amountIn = null;
+  if (e.y === 'T') {
+    hoursIn = document.createElement('input');
+    hoursIn.type = 'number';
+    hoursIn.min = '0';
+    hoursIn.step = '0.25';
+    hoursIn.value = e.h;
+    cell(hoursIn, 'num');
+    // amount is derived, show read-only preview
+    var preview = document.createElement('span');
+    preview.textContent = money(e.a);
+    hoursIn.addEventListener('input', function () {
+      var h = parseFloat(hoursIn.value);
+      preview.textContent = h > 0 ? money(h * entryRate(e)) : '\u2014';
+    });
+    cell(preview, 'num');
+  } else {
+    var blank = document.createElement('span');
+    cell(blank, 'num');
+    amountIn = document.createElement('input');
+    amountIn.type = 'number';
+    amountIn.min = '0';
+    amountIn.step = '0.01';
+    amountIn.value = e.a;
+    cell(amountIn, 'num');
+  }
+
+  // save / cancel
+  var actions = document.createElement('td');
+  actions.className = 'num actions';
+
+  var saveBtn = document.createElement('button');
+  saveBtn.className = 'row-btn save';
+  saveBtn.title = 'Save changes';
+  saveBtn.textContent = '\u2713';
+  saveBtn.addEventListener('click', function () {
+    if (dateIn.value) e.ts = dateIn.value;
+    e.d = descIn.value.trim();
+    if (e.y === 'T') {
+      var h = parseFloat(hoursIn.value);
+      if (!(h > 0)) { hoursIn.focus(); return; }
+      var rate = entryRate(e);
+      e.h = h;
+      e.a = +(h * rate).toFixed(2);
+    } else {
+      var a = parseFloat(amountIn.value);
+      if (!(a > 0)) { amountIn.focus(); return; }
+      e.c = catSel.value;
+      e.a = +a.toFixed(2);
+    }
+    editIndex = -1;
+    save().then(render);
+  });
+  actions.appendChild(saveBtn);
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'row-btn';
+  cancelBtn.title = 'Cancel';
+  cancelBtn.textContent = '\u00d7';
+  cancelBtn.addEventListener('click', function () {
+    editIndex = -1;
+    renderLedger();
+    resize();
+  });
+  actions.appendChild(cancelBtn);
+
+  tr.appendChild(actions);
+  return tr;
+}
+
+// Rate snapshotted when the entry was logged (amount / hours), so editing
+// hours doesn't silently reprice old work at today's rate. Falls back to
+// the current rate if the entry can't tell us.
+function entryRate(e) {
+  if (e.h > 0 && e.a > 0) return e.a / e.h;
+  return Number(cfg.r) || 0;
 }
 
 /* ---------- CSV export ---------- */

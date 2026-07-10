@@ -213,16 +213,36 @@ input:focus, select:focus {
 }
 .num { text-align: right; }
 
-.del {
+.actions { white-space: nowrap; }
+
+.row-btn {
   border: none;
   background: none;
   color: var(--text-subtle);
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
 }
-.del:hover { color: var(--over); }
+.row-btn:hover { color: var(--accent); }
+.row-btn.del { font-size: 15px; }
+.row-btn.del:hover { color: var(--over); }
+.row-btn.save { font-weight: 700; }
+.row-btn.save:hover { color: var(--ok); }
+.row-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* inline edit row */
+.edit-row td { background: var(--field-bg); }
+.edit-row input, .edit-row select {
+  height: 26px;
+  font-size: 13px;
+  width: 100%;
+  min-width: 0;
+}
+.edit-row td { padding: 4px; }
+.edit-row input[type="date"] { width: 118px; }
+.edit-row input[type="number"] { width: 64px; }
+.grow-cell { width: 40%; }
 
 .empty-hint {
   color: var(--text-subtle);
