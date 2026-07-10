@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Budget</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Setup state (no budget yet) -->
+    <div id="setup" class="hidden">
+      <p class="empty-hint">Set a budget for this card to start tracking time and expenses.</p>
+      <div class="row">
+        <label>Approved budget ($)
+          <input id="setup-budget" type="number" min="0" step="0.01" placeholder="5000">
+        </label>
+        <label>Hourly rate ($)
+          <input id="setup-rate" type="number" min="0" step="0.01" placeholder="75">
+        </label>
+        <button id="setup-save" class="btn primary">Set budget</button>
+      </div>
+    </div>
+
+    <!-- Main state -->
+    <div id="main" class="hidden">
+
+      <!-- Meter -->
+      <div class="meter-wrap">
+        <div class="meter-head">
+          <div>
+            <span id="remaining" class="remaining"></span>
+            <span class="remaining-label">remaining</span>
+          </div>
+          <div class="meter-figures">
+            <span id="spent"></span> spent of <span id="budget"></span>
+            &nbsp;·&nbsp; <a href="#" id="edit-cfg">Edit</a>
+          </div>
+        </div>
+        <div class="meter" id="meter" role="meter" aria-label="Budget used">
+          <div class="meter-fill" id="meter-fill"></div>
+          <div class="tick" style="left:50%"></div>
+          <div class="tick" style="left:80%"></div>
+        </div>
+      </div>
+
+      <!-- Edit config (hidden until Edit clicked) -->
+      <div id="cfg-form" class="row hidden">
+        <label>Approved budget ($)
+          <input id="cfg-budget" type="number" min="0" step="0.01">
+        </label>
+        <label>Hourly rate ($)
+          <input id="cfg-rate" type="number" min="0" step="0.01">
+        </label>
+        <button id="cfg-save" class="btn primary">Save</button>
+        <button id="cfg-cancel" class="btn">Cancel</button>
+      </div>
+
+      <!-- Add entry -->
+      <div class="tabs">
+        <button id="tab-time" class="tab active">Log time</button>
+        <button id="tab-exp" class="tab">Add expense</button>
+        <span class="spacer"></span>
+        <button id="export" class="btn small">Export CSV</button>
+      </div>
+
+      <div id="form-time" class="row">
+        <label class="grow">Task description
+          <input id="time-desc" type="text" placeholder="Client kickoff call" maxlength="80">
+        </label>
+        <label>Hours
+          <input id="time-hours" type="number" min="0" step="0.25" placeholder="1.5">
+        </label>
+        <button id="time-add" class="btn primary">Add</button>
+      </div>
+
+      <div id="form-exp" class="row hidden">
+        <label>Category
+          <select id="exp-cat">
+            <option>Hotel</option>
+            <option>Meals</option>
+            <option>Travel</option>
+            <option>Vendor</option>
+            <option>Materials</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label class="grow">Description
+          <input id="exp-desc" type="text" placeholder="Marriott, 2 nights" maxlength="80">
+        </label>
+        <label>Amount ($)
+          <input id="exp-amount" type="number" min="0" step="0.01" placeholder="240">
+        </label>
+        <button id="exp-add" class="btn primary">Add</button>
+      </div>
+
+      <!-- Ledger -->
+      <table class="ledger" id="ledger">
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Description</th><th class="num">Hrs</th><th class="num">Amount</th><th></th></tr>
+        </thead>
+        <tbody id="ledger-body"></tbody>
+      </table>
+      <p id="ledger-empty" class="empty-hint hidden">No entries yet.</p>
+
+    </div>
+  </div>
+
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <script src="./section.js"></script>
+</body>
+</html>

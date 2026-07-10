@@ -1,0 +1,231 @@
+/* Budget Power-Up — card-back section styles
+   Design intent: feel native inside a Trello card, with one signature
+   element — the budget meter — carrying the color story
+   (green → yellow → orange → red as budget burns down). */
+
+:root {
+  --text: #172b4d;
+  --text-subtle: #5e6c84;
+  --line: #dfe1e6;
+  --field-bg: #fafbfc;
+  --ok: #61bd4f;      /* Trello green  */
+  --warm: #f2d600;    /* Trello yellow */
+  --hot: #ff991f;     /* Trello orange */
+  --over: #eb5a46;    /* Trello red    */
+  --accent: #0079bf;  /* Trello blue   */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #b6c2cf;
+    --text-subtle: #8c9bab;
+    --line: #3d474f;
+    --field-bg: #22272b;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+}
+
+#app { padding: 4px 2px 8px; }
+
+.hidden { display: none !important; }
+
+/* ---------- meter (signature element) ---------- */
+
+.meter-wrap { margin-bottom: 12px; }
+
+.meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.remaining {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.remaining[data-state="ok"]   { color: var(--ok); }
+.remaining[data-state="warm"] { color: #b89b00; }
+.remaining[data-state="hot"]  { color: var(--hot); }
+.remaining[data-state="over"] { color: var(--over); }
+
+.remaining-label {
+  font-size: 12px;
+  color: var(--text-subtle);
+  margin-left: 4px;
+}
+
+.meter-figures {
+  font-size: 12px;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.meter-figures a { color: var(--accent); text-decoration: none; }
+.meter-figures a:hover { text-decoration: underline; }
+
+.meter {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--field-bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 6px 0 0 6px;
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+.meter[data-state="ok"]   .meter-fill { background: var(--ok); }
+.meter[data-state="warm"] .meter-fill { background: var(--warm); }
+.meter[data-state="hot"]  .meter-fill { background: var(--hot); }
+.meter[data-state="over"] .meter-fill { background: var(--over); }
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-fill { transition: none; }
+}
+
+/* threshold ticks at 50% and 80% */
+.tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+
+/* ---------- forms ---------- */
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+}
+
+.grow { flex: 1 1 160px; }
+
+input, select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--field-bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  width: 110px;
+}
+.grow input { width: 100%; }
+input:focus, select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--field-bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(0.96); }
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn.small { height: 26px; font-size: 12px; padding: 0 10px; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- tabs ---------- */
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+
+.tab {
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.spacer { flex: 1; }
+
+/* ---------- ledger ---------- */
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ledger th {
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-subtle);
+  border-bottom: 1px solid var(--line);
+  padding: 4px 6px;
+}
+.ledger td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.num { text-align: right; }
+
+.del {
+  border: none;
+  background: none;
+  color: var(--text-subtle);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.del:hover { color: var(--over); }
+
+.empty-hint {
+  color: var(--text-subtle);
+  font-size: 13px;
+  margin: 6px 0 10px;
+}
