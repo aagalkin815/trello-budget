@@ -141,6 +141,7 @@ input, select {
   font-family: inherit;
   width: 110px;
 }
+input[type="date"] { width: 132px; }
 .grow input { width: 100%; }
 input:focus, select:focus {
   outline: 2px solid var(--accent);

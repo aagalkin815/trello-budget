@@ -336,9 +336,11 @@ $('time-add').addEventListener('click', function () {
   var h = parseFloat($('time-hours').value);
   var d = $('time-desc').value.trim();
   if (!(h > 0)) { $('time-hours').focus(); return; }
-  log.push({ y: 'T', d: d, h: h, a: +(h * (Number(cfg.r) || 0)).toFixed(2), ts: today() });
+  var ts = $('time-date').value || today();
+  log.push({ y: 'T', d: d, h: h, a: +(h * (Number(cfg.r) || 0)).toFixed(2), ts: ts });
   $('time-hours').value = '';
   $('time-desc').value = '';
+  $('time-date').value = today();
   save().then(render);
 });
 
@@ -346,9 +348,11 @@ $('exp-add').addEventListener('click', function () {
   var a = parseFloat($('exp-amount').value);
   var d = $('exp-desc').value.trim();
   if (!(a > 0)) { $('exp-amount').focus(); return; }
-  log.push({ y: 'E', d: d, c: $('exp-cat').value, a: +a.toFixed(2), ts: today() });
+  var ts = $('exp-date').value || today();
+  log.push({ y: 'E', d: d, c: $('exp-cat').value, a: +a.toFixed(2), ts: ts });
   $('exp-amount').value = '';
   $('exp-desc').value = '';
+  $('exp-date').value = today();
   save().then(render);
 });
 
@@ -357,6 +361,8 @@ $('export').addEventListener('click', exportCsv);
 /* ---------- init ---------- */
 
 t.render(function () {
+  $('time-date').value = today();
+  $('exp-date').value = today();
   Promise.all([
     t.get('card', 'shared', 'cfg'),
     t.get('card', 'shared', 'log')
