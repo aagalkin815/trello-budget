@@ -3,7 +3,8 @@
 var t = window.TrelloPowerUp.iframe();
 
 var cfg = null;   // { b: approvedBudget, r: hourlyRate }
-var log = [];     // [{ y: 'T'|'E', d: desc, h: hours, c: category, a: amount, ts: 'YYYY-MM-DD' }]
+var log = [];     // [{ y: 'T'|'E'|'I', d: desc, h: hours, c: category, a: amount, ts: 'YYYY-MM-DD' }]
+                  // y:'I' = an invoice line: previously unbilled entries collapsed into one row
 var editIndex = -1;  // index of the ledger entry currently being edited, -1 = none
 
 var CATEGORIES = ['Hotel', 'Meals', 'Travel', 'Vendor', 'Materials', 'Other'];
@@ -23,10 +24,17 @@ function today() {
 }
 
 function totals() {
-  var spent = 0;
-  log.forEach(function (e) { spent += Number(e.a) || 0; });
+  var spent = 0, invoiced = 0, unbilled = 0;
+  log.forEach(function (e) {
+    var a = Number(e.a) || 0;
+    spent += a;
+    if (e.y === 'I') invoiced += a; else unbilled += a;
+  });
   var b = Number(cfg && cfg.b) || 0;
-  return { budget: b, spent: spent, remaining: b - spent, pct: b > 0 ? spent / b : 0 };
+  return {
+    budget: b, spent: spent, invoiced: invoiced, unbilled: unbilled,
+    remaining: b - spent, pct: b > 0 ? spent / b : 0
+  };
 }
 
 function save() {
@@ -65,6 +73,17 @@ function render() {
     $('meter').dataset.state = state;
     $('remaining').dataset.state = state;
 
+    var split = $('split');
+    if (s.invoiced > 0 || s.unbilled > 0) {
+      split.textContent = 'Invoiced ' + money(s.invoiced) + ' \u00b7 Unbilled ' + money(s.unbilled);
+      split.classList.remove('hidden');
+    } else {
+      split.classList.add('hidden');
+    }
+
+    $('invoice').disabled = s.unbilled <= 0;
+    $('export-unbilled').disabled = s.unbilled <= 0;
+
     renderLedger();
   }
   resize();
@@ -83,6 +102,7 @@ function renderLedger() {
 
 function buildDisplayRow(e, i) {
   var tr = document.createElement('tr');
+  if (e.y === 'I') tr.className = 'inv-row';
 
   function td(text, cls) {
     var el = document.createElement('td');
@@ -92,9 +112,9 @@ function buildDisplayRow(e, i) {
   }
 
   td(e.ts);
-  td(e.y === 'T' ? 'Time' : (e.c || 'Expense'));
+  td(e.y === 'T' ? 'Time' : e.y === 'I' ? 'Invoiced' : (e.c || 'Expense'));
   td(e.d || '');
-  td(e.y === 'T' ? Number(e.h).toString() : '', 'num');
+  td(e.y === 'E' ? '' : (e.h ? Number(e.h).toString() : ''), 'num');
   td(money(e.a), 'num');
 
   var actions = document.createElement('td');
@@ -158,7 +178,7 @@ function buildEditRow(e, i) {
     cell(catSel);
   } else {
     var typeSpan = document.createElement('span');
-    typeSpan.textContent = 'Time';
+    typeSpan.textContent = e.y === 'I' ? 'Invoiced' : 'Time';
     cell(typeSpan);
   }
 
@@ -217,7 +237,7 @@ function buildEditRow(e, i) {
     } else {
       var a = parseFloat(amountIn.value);
       if (!(a > 0)) { amountIn.focus(); return; }
-      e.c = catSel.value;
+      if (catSel) e.c = catSel.value; // invoice rows have no category
       e.a = +a.toFixed(2);
     }
     editIndex = -1;
@@ -248,45 +268,115 @@ function entryRate(e) {
   return Number(cfg.r) || 0;
 }
 
-/* ---------- CSV export ---------- */
+/* ---------- CSV ---------- */
 
 function csvEscape(v) {
   v = String(v == null ? '' : v);
   return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
 }
 
-function exportCsv() {
-  var s = totals();
-  var rows = [
-    ['Date', 'Type', 'Category', 'Description', 'Hours', 'Rate', 'Amount']
+function entryCsvRow(e) {
+  return [
+    e.ts,
+    e.y === 'T' ? 'Time' : e.y === 'I' ? 'Invoiced' : 'Expense',
+    e.y === 'E' ? (e.c || '') : '',
+    e.d || '',
+    e.y === 'E' ? '' : (e.h || ''),
+    e.y === 'T' ? cfg.r : '',
+    Number(e.a).toFixed(2)
   ];
-  log.forEach(function (e) {
-    rows.push([
-      e.ts,
-      e.y === 'T' ? 'Time' : 'Expense',
-      e.y === 'T' ? '' : (e.c || ''),
-      e.d || '',
-      e.y === 'T' ? e.h : '',
-      e.y === 'T' ? cfg.r : '',
-      Number(e.a).toFixed(2)
-    ]);
-  });
-  rows.push([]);
-  rows.push(['Approved budget', '', '', '', '', '', Number(s.budget).toFixed(2)]);
-  rows.push(['Total spent', '', '', '', '', '', Number(s.spent).toFixed(2)]);
-  rows.push(['Remaining', '', '', '', '', '', Number(s.remaining).toFixed(2)]);
+}
 
+function downloadCsv(rows, filename) {
   var csv = rows.map(function (r) { return r.map(csvEscape).join(','); }).join('\r\n');
   var blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'budget-' + today() + '.csv';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   setTimeout(function () {
     URL.revokeObjectURL(a.href);
     a.remove();
   }, 0);
+}
+
+var CSV_HEADER = ['Date', 'Type', 'Category', 'Description', 'Hours', 'Rate', 'Amount'];
+
+function exportCsv() {
+  var s = totals();
+  var rows = [CSV_HEADER];
+  log.forEach(function (e) { rows.push(entryCsvRow(e)); });
+  rows.push([]);
+  rows.push(['Approved budget', '', '', '', '', '', Number(s.budget).toFixed(2)]);
+  rows.push(['Total spent', '', '', '', '', '', Number(s.spent).toFixed(2)]);
+  rows.push(['Remaining', '', '', '', '', '', Number(s.remaining).toFixed(2)]);
+  downloadCsv(rows, 'budget-' + today() + '.csv');
+}
+
+/* ---------- invoicing workflow ----------
+   Intended order:
+   1. "Export unbilled" — download the detail CSV to build the invoice from
+   2. Send the actual invoice (outside Trello)
+   3. "Mark invoiced" — collapse those entries; no download, so the Trello
+      state only says "invoiced" once you've deliberately gone through 1–2. */
+
+function unbilledEntries() {
+  return log.filter(function (e) { return e.y !== 'I'; });
+}
+
+function exportUnbilled() {
+  var unbilled = unbilledEntries();
+  if (!unbilled.length) return;
+  var total = 0, hours = 0;
+  unbilled.forEach(function (e) {
+    total += Number(e.a) || 0;
+    if (e.y === 'T') hours += Number(e.h) || 0;
+  });
+  var rows = [CSV_HEADER];
+  unbilled.forEach(function (e) { rows.push(entryCsvRow(e)); });
+  rows.push([]);
+  rows.push(['Unbilled total', '', '', '', hours ? +hours.toFixed(2) : '', '', total.toFixed(2)]);
+  downloadCsv(rows, 'unbilled-' + today() + '.csv');
+}
+
+function markInvoiced() {
+  var kept = [], unbilled = [];
+  log.forEach(function (e) {
+    (e.y === 'I' ? kept : unbilled).push(e);
+  });
+  if (!unbilled.length) return;
+
+  var total = 0, hours = 0;
+  unbilled.forEach(function (e) {
+    total += Number(e.a) || 0;
+    if (e.y === 'T') hours += Number(e.h) || 0;
+  });
+
+  var num = kept.length + 1;
+
+  var ok = confirm(
+    'Mark ' + unbilled.length + ' unbilled ' +
+    (unbilled.length === 1 ? 'entry' : 'entries') +
+    ' (' + money(total) + ') as invoiced?\n\n' +
+    'They will collapse into a single "Invoice #' + num + '" line and the ' +
+    'individual line items will no longer be shown here. Only do this after ' +
+    'you have exported the unbilled detail and sent the invoice.'
+  );
+  if (!ok) return;
+
+  var inv = {
+    y: 'I',
+    d: 'Invoice #' + num + ' \u00b7 ' + unbilled.length +
+       (unbilled.length === 1 ? ' entry' : ' entries'),
+    h: hours ? +hours.toFixed(2) : 0,
+    a: +total.toFixed(2),
+    ts: today()
+  };
+
+  log = kept.concat([inv]);
+  editIndex = -1;
+  save().then(render);
 }
 
 /* ---------- events ---------- */
@@ -357,6 +447,8 @@ $('exp-add').addEventListener('click', function () {
 });
 
 $('export').addEventListener('click', exportCsv);
+$('export-unbilled').addEventListener('click', exportUnbilled);
+$('invoice').addEventListener('click', markInvoiced);
 
 /* ---------- init ---------- */
 
