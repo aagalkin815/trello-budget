@@ -109,6 +109,36 @@ body {
   background: var(--line);
 }
 
+/* invoiced vs unbilled breakdown under the meter */
+.split-line {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* collapsed invoice lines in the ledger */
+.inv-row td {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.inv-row td:nth-child(2) { color: var(--accent); }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+
+/* open budget: neutral purple, striped so it never reads as a spend level */
+:root { --open: #9f8fef; }
+.remaining[data-state="open"] { color: var(--open); }
+.meter[data-state="open"] .meter-fill {
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    135deg, var(--open) 0 6px, color-mix(in srgb, var(--open) 55%, transparent) 6px 12px);
+}
+
 /* ---------- forms ---------- */
 
 .row {
@@ -129,6 +159,17 @@ label {
 }
 
 .grow { flex: 1 1 160px; }
+
+label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+label.check input { width: auto; height: auto; }
+input:disabled { opacity: 0.5; }
 
 input, select {
   height: 32px;

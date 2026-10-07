@@ -43,8 +43,17 @@ window.TrelloPowerUp.initialize({
       t.get('card', 'shared', 'log')
     ]).then(function (res) {
       var cfg = res[0], log = res[1];
-      if (!cfg || !Number(cfg.b)) return [];
+      if (!cfg || (!cfg.o && !Number(cfg.b))) return [];
       var s = computeTotals(cfg, log);
+
+      // Open budget: purple badge showing spend so far. Purple isn't used by
+      // any budget state, so open cards stand out on the board at a glance.
+      if (cfg.o) {
+        return [{
+          text: 'Open · ' + money(s.spent) + ' spent',
+          color: 'purple'
+        }];
+      }
       var color = 'green';
       if (s.pct >= 1) color = 'red';
       else if (s.pct >= 0.8) color = 'orange';

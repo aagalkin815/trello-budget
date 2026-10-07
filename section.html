@@ -21,6 +21,9 @@
         </label>
         <button id="setup-save" class="btn primary">Set budget</button>
       </div>
+      <label class="check">
+        <input id="setup-open" type="checkbox"> Open budget (no cap, just track time and expenses)
+      </label>
     </div>
 
     <!-- Main state -->
@@ -31,10 +34,11 @@
         <div class="meter-head">
           <div>
             <span id="remaining" class="remaining"></span>
-            <span class="remaining-label">remaining</span>
+            <span class="remaining-label" id="remaining-label">remaining</span>
           </div>
           <div class="meter-figures">
-            <span id="spent"></span> spent of <span id="budget"></span>
+            <span id="fig-fixed"><span id="spent"></span> spent of <span id="budget"></span></span>
+            <span id="fig-open" class="hidden">Open budget</span>
             &nbsp;·&nbsp; <a href="#" id="edit-cfg">Edit</a>
           </div>
         </div>
@@ -53,6 +57,9 @@
         </label>
         <label>Hourly rate ($)
           <input id="cfg-rate" type="number" min="0" step="0.01">
+        </label>
+        <label class="check">
+          <input id="cfg-open" type="checkbox"> Open budget (no cap)
         </label>
         <button id="cfg-save" class="btn primary">Save</button>
         <button id="cfg-cancel" class="btn">Cancel</button>

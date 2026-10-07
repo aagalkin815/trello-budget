@@ -2,7 +2,7 @@
 
 var t = window.TrelloPowerUp.iframe();
 
-var cfg = null;   // { b: approvedBudget, r: hourlyRate }
+var cfg = null;   // { b: approvedBudget, r: hourlyRate, o: true if open budget (no cap) }
 var log = [];     // [{ y: 'T'|'E'|'I', d: desc, h: hours, c: category, a: amount, ts: 'YYYY-MM-DD' }]
                   // y:'I' = an invoice line: previously unbilled entries collapsed into one row
 var editIndex = -1;  // index of the ledger entry currently being edited, -1 = none
@@ -22,6 +22,8 @@ function money(n) {
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
+
+function isOpen() { return !!(cfg && cfg.o); }
 
 function totals() {
   var spent = 0, invoiced = 0, unbilled = 0;
@@ -51,27 +53,40 @@ function resize() { t.sizeTo('#app').catch(function () {}); }
 /* ---------- rendering ---------- */
 
 function render() {
-  var hasCfg = cfg && Number(cfg.b) > 0;
-  $('setup').classList.toggle('hidden', hasCfg);
+  var hasCfg = cfg && (cfg.o || Number(cfg.b) > 0);
+  $('setup').classList.toggle('hidden', !!hasCfg);
   $('main').classList.toggle('hidden', !hasCfg);
 
   if (hasCfg) {
     var s = totals();
+    var open = isOpen();
 
-    $('remaining').textContent = (s.remaining < 0 ? '-' : '') + money(Math.abs(s.remaining));
-    $('spent').textContent = money(s.spent);
-    $('budget').textContent = money(s.budget);
+    $('fig-fixed').classList.toggle('hidden', open);
+    $('fig-open').classList.toggle('hidden', !open);
 
-    var pct = Math.min(s.pct, 1) * 100;
-    var fill = $('meter-fill');
-    fill.style.width = pct + '%';
+    if (open) {
+      // Open budget: lead with total spent, no cap, neutral purple meter
+      $('remaining').textContent = money(s.spent);
+      $('remaining-label').textContent = 'spent';
+      $('meter-fill').style.width = '100%';
+      $('meter').dataset.state = 'open';
+      $('remaining').dataset.state = 'open';
+    } else {
+      $('remaining').textContent = (s.remaining < 0 ? '-' : '') + money(Math.abs(s.remaining));
+      $('remaining-label').textContent = 'remaining';
+      $('spent').textContent = money(s.spent);
+      $('budget').textContent = money(s.budget);
 
-    var state = 'ok';                    // green  < 50%
-    if (s.pct >= 1) state = 'over';      // red    >= 100% (or over)
-    else if (s.pct >= 0.8) state = 'hot'; // orange >= 80%
-    else if (s.pct >= 0.5) state = 'warm'; // yellow >= 50%
-    $('meter').dataset.state = state;
-    $('remaining').dataset.state = state;
+      var pct = Math.min(s.pct, 1) * 100;
+      $('meter-fill').style.width = pct + '%';
+
+      var state = 'ok';                    // green  < 50%
+      if (s.pct >= 1) state = 'over';      // red    >= 100% (or over)
+      else if (s.pct >= 0.8) state = 'hot'; // orange >= 80%
+      else if (s.pct >= 0.5) state = 'warm'; // yellow >= 50%
+      $('meter').dataset.state = state;
+      $('remaining').dataset.state = state;
+    }
 
     var split = $('split');
     if (s.invoiced > 0 || s.unbilled > 0) {
@@ -308,9 +323,11 @@ function exportCsv() {
   var rows = [CSV_HEADER];
   log.forEach(function (e) { rows.push(entryCsvRow(e)); });
   rows.push([]);
-  rows.push(['Approved budget', '', '', '', '', '', Number(s.budget).toFixed(2)]);
+  // Same three summary rows in the same order. Open-budget cards have no
+  // cap, so those two values read "Open" / "N/A" instead of numbers.
+  rows.push(['Approved budget', '', '', '', '', '', isOpen() ? 'Open' : Number(s.budget).toFixed(2)]);
   rows.push(['Total spent', '', '', '', '', '', Number(s.spent).toFixed(2)]);
-  rows.push(['Remaining', '', '', '', '', '', Number(s.remaining).toFixed(2)]);
+  rows.push(['Remaining', '', '', '', '', '', isOpen() ? 'N/A' : Number(s.remaining).toFixed(2)]);
   downloadCsv(rows, 'budget-' + today() + '.csv');
 }
 
@@ -381,17 +398,30 @@ function markInvoiced() {
 
 /* ---------- events ---------- */
 
+// Greys out the budget amount field while "Open budget" is checked
+function bindOpenToggle(checkId, budgetId) {
+  var chk = $(checkId), inp = $(budgetId);
+  function sync() { inp.disabled = chk.checked; }
+  chk.addEventListener('change', sync);
+  sync();
+}
+bindOpenToggle('setup-open', 'setup-budget');
+bindOpenToggle('cfg-open', 'cfg-budget');
+
 $('setup-save').addEventListener('click', function () {
+  var open = $('setup-open').checked;
   var b = parseFloat($('setup-budget').value);
   var r = parseFloat($('setup-rate').value);
-  if (!(b > 0)) { $('setup-budget').focus(); return; }
-  cfg = { b: b, r: r > 0 ? r : 0 };
+  if (!open && !(b > 0)) { $('setup-budget').focus(); return; }
+  cfg = { b: open ? 0 : b, r: r > 0 ? r : 0, o: open };
   save().then(render);
 });
 
 $('edit-cfg').addEventListener('click', function (ev) {
   ev.preventDefault();
-  $('cfg-budget').value = cfg.b;
+  $('cfg-open').checked = isOpen();
+  $('cfg-budget').disabled = isOpen();
+  $('cfg-budget').value = cfg.b > 0 ? cfg.b : '';
   $('cfg-rate').value = cfg.r;
   $('cfg-form').classList.remove('hidden');
   resize();
@@ -403,10 +433,11 @@ $('cfg-cancel').addEventListener('click', function () {
 });
 
 $('cfg-save').addEventListener('click', function () {
+  var open = $('cfg-open').checked;
   var b = parseFloat($('cfg-budget').value);
   var r = parseFloat($('cfg-rate').value);
-  if (!(b > 0)) { $('cfg-budget').focus(); return; }
-  cfg = { b: b, r: r > 0 ? r : 0 };
+  if (!open && !(b > 0)) { $('cfg-budget').focus(); return; }
+  cfg = { b: open ? 0 : b, r: r > 0 ? r : 0, o: open };
   $('cfg-form').classList.add('hidden');
   save().then(render);
 });
